@@ -25,7 +25,7 @@ clean:
 	@rm -f $(target)
 	@rm -rf $(builddir)
 
-test: all # todo: not test this way lmao
+test: clean all # todo: not test this way lmao
 	@echo -n  "[help  test] "				;\
 	./$(target) -h							;\
 	echo -n "[bytes test] "					;\

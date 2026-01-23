@@ -3,6 +3,7 @@
 
 #define _POSIX_C_SOURCE 200809L // required for `fileno` (studio.h)
 
+#include <assert.h>
 #include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
@@ -14,151 +15,147 @@
 #define help_text "no option(s) provided. usage: program_name [ -c | -h | -l | -m | -w ] <file>"
 #define min_args 3
 
-enum { error = -1, bytes, lines, words, chars };
+FILE *file;
+
+//todo error_codes list
+
+typedef enum { error = -1, bytes, lines, words, chars } commands;
+
+int command, counter;
 
 /* declarations */
 
-int ccwc(int argc, char **argv);
-int counter(int command, const char *file);
-int count_bytes(const char *filename);
-int count_chars(const char *filename);
-int check_flags(const char *flag);
-int count_lines(const char *filename);
-int count_words(const char *filename);
-bool file_check(const char *file);
-bool file_error(FILE *fp, int error_code);
-void help_and_exit(void);
+int ccwc(char **argv);
+commands check_flags(const char *flag);
+void count(void);
+void count_bytes(void);
+void count_chars(void);
+void count_lines(void);
+void count_words(void);
+char *get_file_mode(void);
+void handle_error(int error_code);
+void open_file(const char *filename);
+void print_help_and_exit(void);
 
 /* definitions */
 
-inline int ccwc(const int argc, char **argv)
+inline int ccwc(char **argv)
 {
-	if ( argc < min_args ) help_and_exit();
+	command = check_flags(argv[1]);
 
-	const char *flag = argv[1];
+	if (command == error) return EXIT_FAILURE;
+
 	char *filename = argv[2];
-	const int command = check_flags(flag);
 
-	if (command == error || file_check(filename))
-		return EXIT_FAILURE;
+	open_file(filename);
 
-	const int count = counter(command, filename);
-	printf("%2d: %s\n", count, filename);
+	count();
 
-	return EXIT_SUCCESS;
+	printf("%2d: %s\n", counter, filename);
+
+	return fclose(file);
 }
 
-inline int counter(const int command, const char *file)
-{
-	switch (command)
-	{
-	case 0:		return count_bytes(file);
-	case 1:		return count_lines(file);
-	case 2:		return count_words(file);
-	case 3:		return count_chars(file);
-	default:	return error;
-	};
-}
-
-inline int count_bytes(const char *filename)
-{
-	unsigned char c;
-	int byte_count = 0;
-	FILE *fb = fopen(filename, "rb");
-
-	while (fread(&c, sizeof(char), 1, fb) > 0) ++byte_count;
-
-	fclose(fb);
-
-	return byte_count;
-}
-
-inline int count_chars(const char *filename)
-{
-	int char_count = 0;
-	FILE *fr = fopen(filename, "r");
-
-	while (fgetwc(fr) != WEOF) ++char_count;
-
-	fclose(fr);
-
-	return char_count;
-}
-
-inline int check_flags(const char *flag)
+inline commands check_flags(const char *flag)
 {
 	if ( flag[0] != '-')			 return error;
 	if ( strcmp( flag, "-c" ) == 0 ) return bytes;
-	if ( strcmp( flag, "-h" ) == 0 ) help_and_exit();
+	if ( strcmp( flag, "-h" ) == 0 ) print_help_and_exit();
 	if ( strcmp( flag, "-l" ) == 0 ) return lines;
-	if ( strcmp( flag, "-w" ) == 0 ) return words;
 	if ( strcmp( flag, "-m" ) == 0 ) return chars;
+	if ( strcmp( flag, "-w" ) == 0 ) return words;
 
 	return error;
 }
 
-inline int count_lines(const char *filename)
+inline void count(void)
 {
-	char c;
-	int line_count = 0;
-	FILE *fp = fopen(filename, "r");
-
-	while ((c = fgetc(fp)) != EOF) if (c == '\n') ++line_count;
-
-	fclose(fp);
-
-	return line_count;
+	switch (command)
+	{
+		case bytes:		count_bytes(); break;
+		case lines:		count_lines(); break;
+		case words:		count_words(); break;
+		case chars:		count_chars(); break;
+		default   :		handle_error(error); break;
+	};
 }
 
-inline int count_words(const char *filename)
+inline void count_bytes(void)
+{
+	unsigned char c;
+
+	while (fread(&c, sizeof(char), 1, file) > 0) ++counter;
+}
+
+inline void count_chars(void)
+{
+	while (fgetwc(file) != WEOF) ++counter;
+}
+
+inline void count_lines(void)
+{
+	char c;
+
+	while ((c = fgetc(file)) != EOF) if (c == '\n') ++counter;
+}
+
+inline void count_words(void)
 {
 	char c;
 	bool is_char = false;
-	int word_count = 0;
-	FILE *fp = fopen( filename , "r" );
 
-	while ( ( c = fgetc( fp ) ) != EOF )
+	while ( ( c = fgetc( file ) ) != EOF )
 		if ( isspace( c ) ) is_char = false;
-		else if ( !is_char ) is_char = true, ++word_count;
-
-	fclose( fp );
-
-	return word_count;
+		else if ( !is_char ) is_char = true, ++counter;
 }
 
-inline bool file_check(const char *filename)
-{
-	if (filename == NULL)	return file_error(NULL, EINVAL);
-
-	FILE *fp = fopen(filename, "rb");
-
-	if ( fp == NULL )	return file_error(fp, ENOENT);
-	if ( ferror(fp) )	return file_error(fp, ( errno ? errno : EIO ));
-
-	struct stat st;
-
-	if ( fstat( fileno(fp), &st) != 0 )	return file_error(fp, errno);
-	if ( S_ISDIR( st.st_mode ) )			return file_error(fp, EISDIR);
-
-	if ( fseek( fp, 0, SEEK_END ) == 0 )	rewind(fp);
-	else clearerr(fp);
-
-	fclose(fp);
-
-	return false;
-}
-
-inline bool file_error(FILE *fp, const int error_code)
+inline void handle_error(const int error_code)
 {
 	errno = error_code;
 	printf("error! code: %d\n", error_code);
 
-	if (fp != NULL)	fclose(fp);
+	if (file != NULL)
+		fclose(file);
 
-	return true;
+	exit(error_code);
 }
 
-inline void help_and_exit(void)
+inline char *get_file_mode()
+{
+	switch (command)
+	{
+		case bytes:
+		case chars:
+			return "rb";
+		case lines:
+		case words:
+			return "r";
+		default:
+			assert("get_file_mode is breached. a bug! a bug!");
+			return NULL;
+	}
+}
+
+inline void open_file(const char *filename)
+{
+	if (filename == NULL)	handle_error(EINVAL);
+
+	file = fopen(filename, get_file_mode());
+
+	if ( file == NULL )	handle_error(ENOENT);
+	if ( ferror(file) )	handle_error(errno ? errno : EIO);
+
+	struct stat st;
+
+	if ( fstat( fileno(file), &st) != 0 )	handle_error(errno);
+	if ( S_ISDIR( st.st_mode ) )				handle_error(EISDIR);
+
+	if ( fseek(file, 0, SEEK_END) == 0)
+		 rewind(file);
+	else clearerr(file);
+}
+
+inline void print_help_and_exit(void)
 {
 	printf("%s\n", help_text);
 	exit(EXIT_SUCCESS);

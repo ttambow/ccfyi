@@ -30,21 +30,42 @@
 
 char *step_one_object = "{}";
 
-int cjparse(void)
+int cjparse(void);
+FILE *open_file(const char *filename);
+
+
+
+bool cjparse(char **argv)
 {
+	const char *flag = argv[1];
+	const char *filename = argv[2];
+	const int command = check_flags(flag);
+
+	if (command == error || file_check(filename))
+		return EXIT_FAILURE;
+
+	const int count = counter(command, filename);
+	printf("%2d: %s\n", count, filename);
+
 	return EXIT_SUCCESS;
+
+
+	FILE *file = open_file(filename);
+	while (fgetwc(file) != WEOF) {};
+	printf( "we will compare:\n%s\nto:\n%s\n" , step_one_object, "todo" );
+	fclose(file);
+}
+	return EXIT_SUCCESS;
+}
+
+
+FILE *open_file(const char *filename)
+{
+	return fopen(filename, "r");
 }
 
 int main( int argc , char **argv )
 {
-	printf( "%s\n" , step_one_object );
-
-	if ( argc < 3 ) help_and_exit( );
-	FILE *fp = NULL;
-	char *flag = argv[ 1 ];
-	char *filename = argv[ 2 ];
-	int command = check_flags ( flag );
-	if ( command != error && file_check( filename , fp ) )
-		return cjparse();
-	else return EXIT_FAILURE;
+	// if ( argc < 3 ) help_and_exit( );
+	cjparse();
 }
