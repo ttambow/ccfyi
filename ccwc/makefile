@@ -1,35 +1,50 @@
 _name := ccwc
-build := build
+builddir := build
 cc := clang
 cflags := -std=c23 -Wall -Wextra -g
 src := $(wildcard src/*.c)
-obj := $(patsubst src/%.c,$(build)/src/%.o,$(src))
-target := $(build)/$(_name)
-test := test.file
+obj := $(patsubst src/%.c,$(builddir)/src/%.o,$(src))
+target := $(builddir)/$(_name)
+testdir := tests
+testfile := test.file
+testnofile := no.file
 
 all: $(target)
+build: all
 
 $(target): $(obj)
-	@mkdir -p $(build)
+	@mkdir -p $(builddir)
 	@$(cc) $(obj) -o $(target)
 	@rm $(obj)
 
-$(build)/%.o: $(src)
+$(builddir)/%.o: $(src)
 	@mkdir -p $(dir $@)
 	@$(cc) $(cflags) -c $< -o $@
 
 clean:
 	@rm -f $(target)
-	@rm -rf $(build)
+	@rm -rf $(builddir)
 
-test:
-	@./$(target) -c $(test) ;\
-	./$(target) -l $(test) ;\
-	./$(target) -m $(test) ;\
-	./$(target) -w $(test) ;\
-	./$(target) -h
+test: all # todo: not test this way lmao
+	@echo -n  "[help  test] "				;\
+	./$(target) -h							;\
+	echo -n "[bytes test] "					;\
+	./$(target) -c $(testdir)/$(testfile)	;\
+	echo -n  "[lines test] "				;\
+	./$(target) -l $(testdir)/$(testfile)	;\
+	echo -n  "[chars test] "				;\
+	./$(target) -m $(testdir)/$(testfile)	;\
+	echo -n  "[words test] "				;\
+	./$(target) -w $(testdir)/$(testfile)	;\
+	echo -n  "[nofiletest] "				;\
+	./$(target) -w $(testdir)/$(testnofile)	;\
+	echo -n  "[isdir test] "				;\
+	./$(target) -w $(testdir)/				;\
+	echo "\nall tests complete!"
 
-run:
+	@make clean > /dev/null 2>&1
+
+run: all
 	@./$(target) -h
 
-.phony: all clean
+.PHONY: all build clean
