@@ -3,7 +3,7 @@ builddir := build
 cc := clang
 cflags := -std=c23 -Wall -Wextra -g
 src := $(wildcard src/*.c)
-obj := $(patsubst src/%.c,$(builddir)/src/%.o,$(src))
+obj := $(patsubst src/%.c,$(builddir)/%.o,$(src))
 target := $(builddir)/$(_name)
 testdir := tests
 testfile := test.file
@@ -17,8 +17,8 @@ $(target): $(obj)
 	@$(cc) $(obj) -o $(target)
 	@rm $(obj)
 
-$(builddir)/%.o: $(src)
-	@mkdir -p $(dir $@)
+$(builddir)/%.o: src/%.c
+	@mkdir -p $(builddir)
 	@$(cc) $(cflags) -c $< -o $@
 
 clean:

@@ -19,14 +19,11 @@ FILE *file;
 
 //todo error_codes list
 
-typedef enum { error = -1, bytes, lines, words, chars } commands;
+typedef enum { error = -1, bytes, lines, words, chars } commands;;
 
-int command = error, counter = 0;
-int *p_command = &command;
-int *p_counter = &counter;
+int command = error /* default */, counter = 0;
 
-/* declarations */
-
+/* todo create function explanation (documentation)  */
 int ccwc(char **argv);
 void check_flags(const char *flag);
 void count_bytes(void);
@@ -36,43 +33,36 @@ void count_lines(void);
 void count_words(void);
 char *get_file_mode(void);
 void handle_error(int error_code);
-void open_file(const char *filename);
+void open_file(const char *filename); /* may call exit() */
 void print_help_and_exit(void);
-
-/* definitions */
 
 inline int ccwc(char **argv)
 {
 	check_flags(argv[1]);
 
-	if (*p_command == error) return EXIT_FAILURE;
+	if (command == error) return EXIT_FAILURE;
 
 	char *filename = argv[2];
-
 	open_file(filename);
-
 	count_handler();
-
-	printf("%2d: %s\n", *p_counter, filename);
-
+	printf("%2d: %s\n", counter, filename);
 	return fclose(file);
 }
 
 inline void check_flags(const char *flag)
 {
-	if ( flag[0] != '-')					*p_command = error;
-	else if ( strcmp( flag, "-c" ) == 0 )	*p_command = bytes;
-	else if ( strcmp( flag, "-h" ) == 0 )	print_help_and_exit();
-	else if ( strcmp( flag, "-l" ) == 0 )	*p_command = lines;
-	else if ( strcmp( flag, "-m" ) == 0 )	*p_command = chars;
-	else if ( strcmp( flag, "-w" ) == 0 )	*p_command = words;
-	else									*p_command = error;
+	if ( flag[0] != '-')				command = error;
+	if ( strcmp( flag, "-c" ) == 0 )	command = bytes;
+	if ( strcmp( flag, "-h" ) == 0 )	print_help_and_exit();
+	if ( strcmp( flag, "-l" ) == 0 )	command = lines;
+	if ( strcmp( flag, "-m" ) == 0 )	command = chars;
+	if ( strcmp( flag, "-w" ) == 0 )	command = words;
 }
 
 inline void count_bytes(void)
 {
 	fseek(file, 0, SEEK_END);
-	*p_counter = ftell(file);
+	counter = ftell(file);
 }
 
 inline void count_chars(void)
@@ -80,12 +70,12 @@ inline void count_chars(void)
 	unsigned char c;
 	while (fread(&c, 1, 1, file) == 1)
 		// utf "continuation" bytes are not valid chars
-		if ((c & 0xC0) != 0x80) ++*p_counter;
+		if ((c & 0xC0) != 0x80) ++counter;
 }
 
 inline void count_handler(void)
 {
-	switch (*p_command)
+	switch (command)
 	{
 		case bytes:		count_bytes(); break;
 		case lines:		count_lines(); break;
@@ -98,8 +88,7 @@ inline void count_handler(void)
 inline void count_lines(void)
 {
 	char c;
-
-	while ((c = fgetc(file)) != EOF) if (c == '\n') ++*p_counter;
+	while ((c = fgetc(file)) != EOF) if (c == '\n') ++counter;
 }
 
 inline void count_words(void)
@@ -109,7 +98,7 @@ inline void count_words(void)
 
 	while ( ( c = fgetc( file ) ) != EOF )
 		if ( isspace( c ) ) is_char = false;
-		else if ( !is_char ) is_char = true, ++*p_counter;
+		else if ( !is_char ) is_char = true, ++counter;
 }
 
 inline char *get_file_mode(void)
@@ -141,21 +130,24 @@ inline void handle_error(const int error_code)
 
 inline void open_file(const char *filename)
 {
-	if (filename == NULL)	handle_error(EINVAL);
+	if (filename == NULL) handle_error(EINVAL);
 
 	file = fopen(filename, get_file_mode());
 
 	if ( file == NULL )	handle_error(ENOENT);
-	if ( ferror(file) )	handle_error(errno ? errno : EIO);
+	if ( ferror(file) )	handle_error(errno);
 
 	struct stat st;
 
-	if ( fstat( fileno(file), &st) != 0 )	handle_error(errno);
-	if ( S_ISDIR( st.st_mode ) )				handle_error(EISDIR);
+	if ( fstat( fileno(file), &st) != 0 ) handle_error(errno);
+	if ( S_ISDIR( st.st_mode ) ) handle_error(EISDIR);
 
 	if ( fseek(file, 0, SEEK_END) == 0)
 		rewind(file);
-	else clearerr(file);
+	else {
+		clearerr(file);
+		exit(EXIT_FAILURE);
+	}
 }
 
 inline void print_help_and_exit(void)
