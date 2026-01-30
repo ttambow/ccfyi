@@ -1,10 +1,10 @@
 _name := cjparse
-build := build
+builddir := build
 cc := clang
 cflags := -std=c23 -Wall -Wextra -g
 src := $(wildcard src/*.c)
-obj := $(patsubst src/%.c,$(build)/src/%.o,$(src))
-target := $(build)/$(_name)
+obj := $(patsubst src/%.c,$(builddir)/%.o,$(src))
+target := $(builddir)/$(_name)
 
 # test
 shell := $(SHELL)
@@ -16,20 +16,20 @@ all: $(target)
 build: all
 
 $(target): $(obj)
-	@mkdir -p $(build)
+	@mkdir -p $(builddir)
 	@$(cc) $(obj) -o $(target)
 	@rm $(obj)
 
-$(build)/%.o: $(src)
-	@mkdir -p $(dir $@)
+$(builddir)/%.o: src/%.c
+	@mkdir -p $(builddir)
 	@$(cc) $(cflags) -c $< -o $@
 
 clean:
 	@rm -f $(target)
-	@rm -rf $(build)
+	@rm -rf $(builddir)
 
-run:
-	@./$(target) #-h
+run: all
+	@./$(target) $(filter-out $@,$(MAKECMDGOALS))
 
 test:
 # help
